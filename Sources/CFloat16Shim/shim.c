@@ -1,0 +1,1 @@
+typedef int _cfloat16_shim_translation_unit_not_empty;

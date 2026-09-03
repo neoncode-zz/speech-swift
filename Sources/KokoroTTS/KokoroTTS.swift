@@ -78,7 +78,7 @@ public final class KokoroTTSModel {
 
         var audio = [Float](repeating: 0, count: validSamples)
         if result.audio.dataType == .float16 {
-            let ptr = result.audio.dataPointer.bindMemory(to: Float16.self, capacity: validSamples)
+            let ptr = result.audio.dataPointer.bindMemory(to: OSFloat16.self, capacity: validSamples)
             for i in 0..<validSamples { audio[i] = Float(ptr[i]) }
         } else {
             let ptr = result.audio.dataPointer.bindMemory(to: Float.self, capacity: validSamples)

@@ -1,6 +1,7 @@
 import CoreML
 import Foundation
 import AudioCommon
+import Float16Compat
 
 /// Parakeet TDT 0.6B v3 — CoreML-based automatic speech recognition.
 ///
@@ -251,8 +252,8 @@ public class ParakeetASRModel {
         // Create zero-padded mel array [1, 128, targetLength]
         let padded = try MLMultiArray(
             shape: [1, 128, targetLength as NSNumber], dataType: mel.dataType)
-        let srcPtr = mel.dataPointer.assumingMemoryBound(to: Float16.self)
-        let dstPtr = padded.dataPointer.assumingMemoryBound(to: Float16.self)
+        let srcPtr = mel.dataPointer.assumingMemoryBound(to: OSFloat16.self)
+        let dstPtr = padded.dataPointer.assumingMemoryBound(to: OSFloat16.self)
 
         let numMelBins = config.numMelBins
         for bin in 0..<numMelBins {
@@ -261,7 +262,7 @@ public class ParakeetASRModel {
             dstPtr.advanced(by: dstOffset)
                 .update(from: srcPtr.advanced(by: srcOffset), count: melFrames)
             dstPtr.advanced(by: dstOffset + melFrames)
-                .update(repeating: Float16(0), count: targetLength - melFrames)
+                .update(repeating: OSFloat16(0), count: targetLength - melFrames)
         }
 
         return (padded, actualLength)

@@ -248,6 +248,11 @@ let package = Package(
         .package(url: "https://github.com/argmaxinc/WhisperKit", from: "1.0.0")
     ],
     targets: [
+        .target(name: "CFloat16Shim"),
+        .target(
+            name: "Float16Compat",
+            dependencies: ["CFloat16Shim"]
+        ),
         .target(
             name: "AudioCommon",
             dependencies: [
@@ -267,6 +272,7 @@ let package = Package(
         .target(
             name: "Qwen3ASR",
             dependencies: [
+                "Float16Compat",
                 "AudioCommon",
                 "MLXCommon",
                 "SpeechVAD",
@@ -343,6 +349,7 @@ let package = Package(
         .target(
             name: "CosyVoiceTTS",
             dependencies: [
+                "Float16Compat",
                 "AudioCommon",
                 "MLXCommon",
                 .product(name: "MLX", package: "mlx-swift"),
@@ -366,6 +373,7 @@ let package = Package(
         .target(
             name: "ChatterboxTTS",
             dependencies: [
+                "Float16Compat",
                 "AudioCommon",
                 "MLXCommon",
                 .product(name: "MLX", package: "mlx-swift"),
@@ -378,6 +386,7 @@ let package = Package(
         .target(
             name: "IndicMioTTS",
             dependencies: [
+                "Float16Compat",
                 "AudioCommon",
                 "MLXCommon",
                 .product(name: "MLX", package: "mlx-swift"),
@@ -391,6 +400,7 @@ let package = Package(
         .target(
             name: "FishAudioTTS",
             dependencies: [
+                "Float16Compat",
                 "AudioCommon",
                 "MLXCommon",
                 .product(name: "MLX", package: "mlx-swift"),
@@ -414,6 +424,7 @@ let package = Package(
         .target(
             name: "HiggsTTS",
             dependencies: [
+                "Float16Compat",
                 "AudioCommon",
                 "MLXCommon",
                 .product(name: "MLX", package: "mlx-swift"),
@@ -426,6 +437,7 @@ let package = Package(
         .target(
             name: "IndexTTS2TTS",
             dependencies: [
+                "Float16Compat",
                 "AudioCommon",
                 "ChatterboxTTS",
                 "MLXCommon",

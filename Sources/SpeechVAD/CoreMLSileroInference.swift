@@ -21,9 +21,9 @@ extension SileroVADModel {
         return try autoreleasepool {
             // Create audio input: [1, 1, 576] float16
             let audioArray = try MLMultiArray(shape: [1, 1, 576], dataType: .float16)
-            let audioPtr = audioArray.dataPointer.assumingMemoryBound(to: Float16.self)
+            let audioPtr = audioArray.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             for i in 0..<576 {
-                audioPtr[i] = Float16(fullSamples[i])
+                audioPtr[i] = OSFloat16(fullSamples[i])
             }
 
             // Initialize h/c to zeros on first call
@@ -48,7 +48,7 @@ extension SileroVADModel {
 
             // Extract probability scalar
             let probArray = result.featureValue(for: "probability")!.multiArrayValue!
-            let probPtr = probArray.dataPointer.assumingMemoryBound(to: Float16.self)
+            let probPtr = probArray.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             return Float(probPtr[0])
         }
     }
@@ -56,7 +56,7 @@ extension SileroVADModel {
     /// Zero-fill a float16 MLMultiArray.
     private func zeroFillFloat16(_ array: MLMultiArray) {
         let ptr = UnsafeMutableBufferPointer(
-            start: array.dataPointer.assumingMemoryBound(to: Float16.self),
+            start: array.dataPointer.assumingMemoryBound(to: OSFloat16.self),
             count: array.count)
         for i in 0..<ptr.count {
             ptr[i] = 0

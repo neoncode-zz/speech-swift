@@ -2,6 +2,7 @@
 import AudioCommon
 import CoreML
 import Foundation
+import Float16Compat
 
 extension WeSpeakerModel {
 
@@ -32,12 +33,12 @@ extension WeSpeakerModel {
             shape: [1, targetLength as NSNumber, 80],
             dataType: .float16
         )
-        let melPtr = melArray.dataPointer.assumingMemoryBound(to: Float16.self)
+        let melPtr = melArray.dataPointer.assumingMemoryBound(to: OSFloat16.self)
 
         // Fill with mel data (row-major: frame-major, 80 mels per frame)
         let copyCount = min(nFrames, targetLength) * 80
         for i in 0..<copyCount {
-            melPtr[i] = Float16(melSpec[i])
+            melPtr[i] = OSFloat16(melSpec[i])
         }
         // Zero-pad remaining frames
         let totalElements = targetLength * 80
@@ -59,7 +60,7 @@ extension WeSpeakerModel {
 
         // Read 256 float16 values
         var embedding = [Float](repeating: 0, count: 256)
-        let embPtr = embArray.dataPointer.assumingMemoryBound(to: Float16.self)
+        let embPtr = embArray.dataPointer.assumingMemoryBound(to: OSFloat16.self)
         for i in 0..<256 {
             embedding[i] = Float(embPtr[i])
         }

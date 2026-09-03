@@ -260,7 +260,7 @@ public class CoreMLTextDecoder {
         let dstBase = destSlot * hidden
         switch src.dataType {
         case .float16:
-            let p = src.dataPointer.assumingMemoryBound(to: Float16.self)
+            let p = src.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             for j in 0..<hidden { dst[dstBase + j] = Float(p[base + j * lastStride]) }
         case .float32:
             let p = src.dataPointer.assumingMemoryBound(to: Float.self)
@@ -462,7 +462,7 @@ public class CoreMLTextDecoder {
         let i = Int(index) * lastStride
         switch logits.dataType {
         case .float16:
-            let ptr = logits.dataPointer.assumingMemoryBound(to: Float16.self)
+            let ptr = logits.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             return Float(ptr[i])
         case .float32:
             let ptr = logits.dataPointer.assumingMemoryBound(to: Float.self)
@@ -491,7 +491,7 @@ public class CoreMLTextDecoder {
 
         switch logits.dataType {
         case .float16:
-            let ptr = logits.dataPointer.assumingMemoryBound(to: Float16.self)
+            let ptr = logits.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             for i in 0..<vocab where i != skipIdx {
                 let val = Float(ptr[i * lastStride])
                 if val.isNaN { nanCount += 1; continue }

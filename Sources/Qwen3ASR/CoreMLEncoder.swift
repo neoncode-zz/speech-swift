@@ -3,6 +3,7 @@ import CoreML
 import Foundation
 import MLX
 import AudioCommon
+import Float16Compat
 
 /// CoreML audio encoder for Qwen3-ASR.
 ///
@@ -177,7 +178,7 @@ public class CoreMLASREncoder {
 
         switch array.dataType {
         case .float16:
-            let src = array.dataPointer.assumingMemoryBound(to: Float16.self)
+            let src = array.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             var floats = [Float](repeating: 0, count: count)
             for i in 0..<count { floats[i] = Float(src[i]) }
             return MLXArray(floats, shape)

@@ -1,6 +1,7 @@
 import Accelerate
 import CoreML
 import Foundation
+import Float16Compat
 
 /// Mel spectrogram preprocessor for Parakeet TDT models.
 ///
@@ -179,11 +180,11 @@ struct MelPreprocessor {
         let mel = try MLMultiArray(
             shape: [1, config.numMelBins as NSNumber, nFrames as NSNumber],
             dataType: .float16)
-        let melPtr = mel.dataPointer.assumingMemoryBound(to: Float16.self)
+        let melPtr = mel.dataPointer.assumingMemoryBound(to: OSFloat16.self)
 
         // melSpec is [numMelBins, nFrames] row-major, same as MLMultiArray [1, 128, T]
         for i in 0..<(config.numMelBins * nFrames) {
-            melPtr[i] = Float16(melSpec[i])
+            melPtr[i] = OSFloat16(melSpec[i])
         }
 
         return (mel, melLength)

@@ -67,6 +67,68 @@ public enum WeightLoader {
         print("Applied weights to text decoder (\(textModel.layers.count) layers, \(appliedTotal) tensors)")
     }
 
+    /// Load a quantized checkpoint into a float text decoder.
+    ///
+    /// Every quantized tensor triple (`X.weight`, `X.scales`, `X.biases`) is dequantized to
+    /// `dtype`; remaining float tensors (norms) are cast to `dtype` so the decoder runs in a
+    /// single dtype. Intended for hosts whose MLX backend has no fast quantized kernels.
+    public static func loadDequantizedTextDecoderWeights(
+        into textModel: FloatTextModel,
+        from directory: URL,
+        dtype: DType = .float32
+    ) throws {
+        var quantizedWeights: [String: MLXArray] = [:]
+        for file in try safetensorFiles(in: directory) {
+            quantizedWeights.merge(stripPrefix(try loadSafetensors(url: file), prefix: "model.")) { _, new in new }
+        }
+        guard !quantizedWeights.isEmpty else { throw WeightLoadingError.noWeightsFound(directory) }
+        let textWeights = dequantizedWeights(
+            quantizedWeights,
+            groupSize: textModel.config.groupSize,
+            bits: textModel.config.bits,
+            dtype: dtype
+        )
+
+        applyFloatTextDecoderComponents(to: textModel, weights: textWeights)
+
+        print("Applied dequantized text decoder weights (\(textModel.layers.count) layers, \(dtype))")
+    }
+
+    /// Replace each quantized triple (`X.weight` + `X.scales` [+ `X.biases`]) with a single float
+    /// `X.weight`; cast every other tensor to `dtype`. `.scales`/`.biases` keys are dropped.
+    static func dequantizedWeights(
+        _ weights: [String: MLXArray],
+        groupSize: Int,
+        bits: Int,
+        dtype: DType
+    ) -> [String: MLXArray] {
+        var result: [String: MLXArray] = [:]
+        result.reserveCapacity(weights.count)
+
+        for (key, value) in weights {
+            if key.hasSuffix(".scales") || key.hasSuffix(".biases") {
+                continue
+            }
+            if key.hasSuffix(".weight") {
+                let base = String(key.dropLast(".weight".count))
+                if let scales = weights["\(base).scales"] {
+                    result[key] = dequantized(
+                        value,
+                        scales: scales,
+                        biases: weights["\(base).biases"],
+                        groupSize: groupSize,
+                        bits: bits,
+                        dtype: dtype
+                    )
+                    continue
+                }
+            }
+            result[key] = value.asType(dtype)
+        }
+
+        return result
+    }
+
     // MARK: - Forced Aligner Weight Loading
 
     /// Load weights for the forced aligner model. Per-shard streaming.

@@ -1,6 +1,7 @@
 import CoreML
 import Foundation
 import NaturalLanguage
+import Float16Compat
 
 /// Multilingual phonemizer for Kokoro TTS.
 ///
@@ -560,7 +561,7 @@ public final class KokoroPhonemizer {
                 var maxId = 0
                 var maxVal: Float = -.infinity
                 if logits.dataType == .float16 {
-                    let lPtr = logits.dataPointer.assumingMemoryBound(to: Float16.self)
+                    let lPtr = logits.dataPointer.assumingMemoryBound(to: OSFloat16.self)
                     for v in 0..<vocabSize {
                         let val = Float(lPtr[lastOffset + v])
                         if val > maxVal { maxVal = val; maxId = v }

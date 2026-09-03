@@ -112,7 +112,7 @@ public final class CamPlusPlusSpeaker {
             shape: [1, targetFrames as NSNumber, 80],
             dataType: .float16
         )
-        let melPtr = melArray.dataPointer.assumingMemoryBound(to: Float16.self)
+        let melPtr = melArray.dataPointer.assumingMemoryBound(to: OSFloat16.self)
 
         if nFrames >= targetFrames {
             // Center-crop: take the middle 500 frames
@@ -120,14 +120,14 @@ public final class CamPlusPlusSpeaker {
             for i in 0..<(targetFrames * 80) {
                 let frame = i / 80
                 let bin = i % 80
-                melPtr[i] = Float16(melSpec[(offset + frame) * 80 + bin])
+                melPtr[i] = OSFloat16(melSpec[(offset + frame) * 80 + bin])
             }
         } else {
             // Tile: repeat mel frames to fill targetFrames
             for i in 0..<(targetFrames * 80) {
                 let frame = (i / 80) % nFrames
                 let bin = i % 80
-                melPtr[i] = Float16(melSpec[frame * 80 + bin])
+                melPtr[i] = OSFloat16(melSpec[frame * 80 + bin])
             }
         }
 
@@ -143,7 +143,7 @@ public final class CamPlusPlusSpeaker {
         }
 
         var embedding = [Float](repeating: 0, count: Self.embeddingDim)
-        let embPtr = embArray.dataPointer.assumingMemoryBound(to: Float16.self)
+        let embPtr = embArray.dataPointer.assumingMemoryBound(to: OSFloat16.self)
         for i in 0..<Self.embeddingDim {
             embedding[i] = Float(embPtr[i])
         }

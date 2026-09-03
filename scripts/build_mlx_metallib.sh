@@ -44,7 +44,39 @@ if [[ -z "${OUT_DIR:-}" || ! -d "$OUT_DIR" ]]; then
   exit 1
 fi
 
-MLX_SWIFT_DIR="$BUILD_DIR/checkouts/mlx-swift"
+# mlx-swift location: explicit override wins, then SwiftPM's resolved
+# dependency graph, then the plain checkout. Assuming checkouts/ is wrong as
+# soon as the consuming package overrides mlx-swift with a local fork: the
+# shaders would then be compiled from a different tree than the library the
+# app actually links against, and the mismatch is silent.
+if [[ -z "${MLX_SWIFT_DIR:-}" ]]; then
+  PKG_ROOT="$(cd "$BUILD_DIR/.." && pwd)"
+  MLX_SWIFT_DIR="$( (cd "$PKG_ROOT" && swift package show-dependencies --format json 2>/dev/null) \
+    | python3 -c '
+import json, sys
+seen = set()
+def walk(node):
+    for dep in node.get("dependencies", []):
+        identity = dep.get("identity")
+        if identity in seen:
+            continue
+        seen.add(identity)
+        yield dep
+        yield from walk(dep)
+try:
+    root = json.load(sys.stdin)
+except ValueError:
+    sys.exit(0)
+for dep in walk(root):
+    if dep.get("identity") == "mlx-swift":
+        print(dep.get("path") or "")
+        break
+' || true)"
+fi
+if [[ -z "${MLX_SWIFT_DIR:-}" || ! -d "$MLX_SWIFT_DIR" ]]; then
+  MLX_SWIFT_DIR="$BUILD_DIR/checkouts/mlx-swift"
+fi
+echo "==> mlx-swift: $MLX_SWIFT_DIR"
 KERNELS_DIR="$MLX_SWIFT_DIR/Source/Cmlx/mlx/mlx/backend/metal/kernels"
 
 if [[ ! -d "$KERNELS_DIR" ]]; then

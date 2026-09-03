@@ -2,6 +2,7 @@ import Foundation
 import MLXCommon
 import CoreML
 import AudioCommon
+import Float16Compat
 
 /// Inference engine for DeepFilterNet3 speech enhancement.
 public enum SpeechEnhancerEngine: String, Sendable {
@@ -491,7 +492,7 @@ public final class SpeechEnhancer {
     /// Extract float32 data from an MLMultiArray, handling float16 output from Core ML.
     private func extractMLMultiArrayFlat(_ array: MLMultiArray, into output: inout [Float], count: Int) {
         if array.dataType == .float16 {
-            let ptr = array.dataPointer.assumingMemoryBound(to: Float16.self)
+            let ptr = array.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             for i in 0..<count {
                 output[i] = Float(ptr[i])
             }

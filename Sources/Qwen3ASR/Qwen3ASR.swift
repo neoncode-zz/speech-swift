@@ -129,7 +129,7 @@ public class Qwen3ASRModel {
 
     public let audioEncoder: Qwen3AudioEncoder
     public let featureExtractor: WhisperFeatureExtractor
-    public var textDecoder: QuantizedTextModel?
+    public var textDecoder: (any Qwen3TextDecoding)?
 
     /// Tokenizer for decoding output tokens
     private var tokenizer: Qwen3Tokenizer?
@@ -163,9 +163,13 @@ public class Qwen3ASRModel {
         self.tokenizer = tokenizer
     }
 
-    /// Initialize text decoder (called after loading)
-    func initializeTextDecoder() {
-        self.textDecoder = QuantizedTextModel(config: textConfig)
+    /// Initialize text decoder (called after loading).
+    /// - Parameter dequantized: build a float decoder that receives dequantized weights.
+    ///   Use on hosts whose MLX backend has no fast quantized-matmul kernels.
+    func initializeTextDecoder(dequantized: Bool = false) {
+        self.textDecoder = dequantized
+            ? FloatTextModel(config: textConfig)
+            : QuantizedTextModel(config: textConfig)
     }
 
     // MARK: - Batched Transcription
@@ -366,7 +370,7 @@ public class Qwen3ASRModel {
     /// temperature=0) behaviour is bit-identical to plain greedy.
     func generateText(
         audioEmbeds: MLXArray,
-        textDecoder: QuantizedTextModel,
+        textDecoder: any Qwen3TextDecoding,
         language: String?,
         maxTokens: Int,
         context: String? = nil,
@@ -412,7 +416,7 @@ public class Qwen3ASRModel {
 
         // Get text embeddings for all tokens
         let inputIdsTensor = MLXArray(inputIds).expandedDimensions(axis: 0)
-        var inputEmbeds = textDecoder.embedTokens(inputIdsTensor)
+        var inputEmbeds = textDecoder.embeddings(for: inputIdsTensor)
 
         // Replace audio_pad token positions with actual audio embeddings
         let audioEmbedsTyped = audioEmbeds.asType(inputEmbeds.dtype)
@@ -425,13 +429,13 @@ public class Qwen3ASRModel {
         var cache: [(MLXArray, MLXArray)]? = nil
 
         // First pass: process the full input embeddings
-        let (hiddenStates, newCache) = textDecoder(inputsEmbeds: inputEmbeds, cache: cache)
+        let (hiddenStates, newCache) = textDecoder.decode(inputsEmbeds: inputEmbeds, attentionMask: nil, cache: cache)
         cache = newCache
 
         // Get logits from the last position using embedding as LM head (tied weights)
         let seqLen = hiddenStates.dim(1)
         let lastHidden = hiddenStates[0..., (seqLen-1)..<seqLen, 0...]
-        let logits = textDecoder.embedTokens.asLinear(lastHidden)
+        let logits = textDecoder.logits(from: lastHidden)
 
         // Greedy fast path uses a double-buffered asyncEval decode loop that
         // overlaps the GPU forward pass for token N+1 with the host-side
@@ -541,7 +545,7 @@ public class Qwen3ASRModel {
     /// produces the exact same token sequence as the legacy loop on
     /// matching inputs.
     static func generateGreedyAsyncEval(
-        textDecoder: QuantizedTextModel,
+        textDecoder: any Qwen3TextDecoding,
         initialLogits: MLXArray,
         cache initialCache: [(MLXArray, MLXArray)],
         maxTokens: Int
@@ -578,12 +582,12 @@ public class Qwen3ASRModel {
             var nextTokenArrN1: MLXArray? = nil
             var cacheN1: [(MLXArray, MLXArray)]? = nil
             if step + 1 < maxTokens {
-                let nextEmbed = textDecoder.embedTokens(
+                let nextEmbed = textDecoder.embeddings(for: 
                     nextTokenArr.expandedDimensions(axis: 0).expandedDimensions(axis: 0)
                 )
-                let (hiddenN1, newCacheN1) = textDecoder(inputsEmbeds: nextEmbed, cache: cache)
+                let (hiddenN1, newCacheN1) = textDecoder.decode(inputsEmbeds: nextEmbed, attentionMask: nil, cache: cache)
                 let lastHiddenN1 = hiddenN1[0..., (-1)..., .ellipsis]
-                let logitsN1 = textDecoder.embedTokens.asLinear(lastHiddenN1)
+                let logitsN1 = textDecoder.logits(from: lastHiddenN1)
                 let argN1 = argMax(logitsN1, axis: -1).squeezed().asType(.int32)
                 // Kick GPU on N+1 (chains after the asyncEval that is
                 // still computing N).
@@ -628,7 +632,7 @@ public class Qwen3ASRModel {
 
     func generateTextBatchedBulkSync(
         audioEmbedsBatch: [(embeds: MLXArray, seqLen: Int)],
-        textDecoder: QuantizedTextModel,
+        textDecoder: any Qwen3TextDecoding,
         language: String?,
         maxTokens: Int,
         context: String? = nil
@@ -655,10 +659,10 @@ public class Qwen3ASRModel {
                 textDecoder: textDecoder
             )
 
-            let (hiddenStates, itemCache) = textDecoder(inputsEmbeds: inputEmbeds)
+            let (hiddenStates, itemCache) = textDecoder.decode(inputsEmbeds: inputEmbeds, attentionMask: nil, cache: nil)
             let seqLen = hiddenStates.dim(1)
             let lastHidden = hiddenStates[0..., (seqLen - 1)..<seqLen, 0...]
-            let logits = textDecoder.embedTokens.asLinear(lastHidden)
+            let logits = textDecoder.logits(from: lastHidden)
             currentItemTokenIds.append(argMax(logits, axis: -1).asType(.int32))
             itemCaches.append(itemCache)
         }
@@ -685,10 +689,10 @@ public class Qwen3ASRModel {
                         continue
                     }
 
-                    let tokenEmbeds = textDecoder.embedTokens(currentItemTokenIds[b])
-                    let (hiddenStates, newCache) = textDecoder(inputsEmbeds: tokenEmbeds, cache: itemCaches[b])
+                    let tokenEmbeds = textDecoder.embeddings(for: currentItemTokenIds[b])
+                    let (hiddenStates, newCache) = textDecoder.decode(inputsEmbeds: tokenEmbeds, attentionMask: nil, cache: itemCaches[b])
                     let lastHidden = hiddenStates[0..., (-1)..., .ellipsis]
-                    let logits = textDecoder.embedTokens.asLinear(lastHidden)
+                    let logits = textDecoder.logits(from: lastHidden)
                     stagedTokens.append(argMax(logits, axis: -1).asType(.int32))
                     stagedCaches.append(newCache)
                 }
@@ -724,7 +728,7 @@ public class Qwen3ASRModel {
 
     func generateTextBatched(
         audioEmbedsBatch: [(embeds: MLXArray, seqLen: Int)],
-        textDecoder: QuantizedTextModel,
+        textDecoder: any Qwen3TextDecoding,
         language: String?,
         maxTokens: Int,
         context: String? = nil
@@ -770,10 +774,10 @@ public class Qwen3ASRModel {
         var itemFirstTokenIds: [MLXArray] = []
         for inputEmbeds in perItemInputEmbeds {
             let itemInput = inputEmbeds.expandedDimensions(axis: 0)
-            let (hiddenStates, itemCache) = textDecoder(inputsEmbeds: itemInput)
+            let (hiddenStates, itemCache) = textDecoder.decode(inputsEmbeds: itemInput, attentionMask: nil, cache: nil)
             let seqLen = hiddenStates.dim(1)
             let lastHidden = hiddenStates[0..., (seqLen - 1)..<seqLen, 0...]
-            let logits = textDecoder.embedTokens.asLinear(lastHidden)
+            let logits = textDecoder.logits(from: lastHidden)
             itemFirstTokenIds.append(argMax(logits, axis: -1).asType(.int32))
             itemCaches.append(itemCache)
         }
@@ -815,17 +819,17 @@ public class Qwen3ASRModel {
             if step + 1 < maxTokens {
                 // Embed all B tokens (finished items get re-embedded; their
                 // logits are ignored). Cache grows uniformly.
-                let batchEmbeds = textDecoder.embedTokens(currentTokenIds)  // [B, 1, H]
+                let batchEmbeds = textDecoder.embeddings(for: currentTokenIds)  // [B, 1, H]
 
                 // Single batched forward for ALL items.
-                let (hidden, newBatchCache) = textDecoder(inputsEmbeds: batchEmbeds, cache: batchKVCache)
+                let (hidden, newBatchCache) = textDecoder.decode(inputsEmbeds: batchEmbeds, attentionMask: nil, cache: batchKVCache)
 
                 // Batched LM head on the last position.
                 let lastH = hidden[0..., (-1)..., 0...]  // [B, 1, H]
                 var perItemTokenIds: [MLXArray] = []
                 for b in 0..<B {
                     let itemHidden = lastH[b..<(b + 1), 0..., 0...]  // [1, 1, H]
-                    let itemLogits = textDecoder.embedTokens.asLinear(itemHidden)  // [1, 1, V]
+                    let itemLogits = textDecoder.logits(from: itemHidden)  // [1, 1, V]
                     perItemTokenIds.append(argMax(itemLogits, axis: -1).asType(.int32))
                 }
                 let nextBatchTokenIds = concatenated(perItemTokenIds, axis: 0)  // [B, 1]
@@ -896,7 +900,7 @@ public class Qwen3ASRModel {
         prefixTokenIds: [Int32],
         suffixTokenIds: [Int32],
         audioStartIndex: Int,
-        textDecoder: QuantizedTextModel
+        textDecoder: any Qwen3TextDecoding
     ) -> MLXArray {
         var inputIds = prefixTokenIds
         for _ in 0..<audioTokenCount {
@@ -905,7 +909,7 @@ public class Qwen3ASRModel {
         inputIds.append(contentsOf: suffixTokenIds)
 
         let inputIdsTensor = MLXArray(inputIds).expandedDimensions(axis: 0)
-        var inputEmbeds = textDecoder.embedTokens(inputIdsTensor)
+        var inputEmbeds = textDecoder.embeddings(for: inputIdsTensor)
 
         let audioEmbedsTyped = audioEmbeds.asType(inputEmbeds.dtype)
         let audioEndIndex = audioStartIndex + audioTokenCount
@@ -936,7 +940,7 @@ public class Qwen3ASRModel {
     /// n-gram masking, and temperature sampling, so there's no benefit
     /// from `asyncEval` overlap.
     static func generateSlow(
-        textDecoder: QuantizedTextModel,
+        textDecoder: any Qwen3TextDecoding,
         initialLogits: MLXArray,
         cache initialCache: [(MLXArray, MLXArray)],
         maxTokens: Int,
@@ -956,14 +960,14 @@ public class Qwen3ASRModel {
         for _ in 1..<maxTokens {
             if nextToken == Int32(Qwen3ASRTokens.eosTokenId) { break }
 
-            let tokenEmbeds = textDecoder.embedTokens(
+            let tokenEmbeds = textDecoder.embeddings(for: 
                 MLXArray([nextToken]).expandedDimensions(axis: 0)
             )
-            let (hiddenStates, newCache) = textDecoder(inputsEmbeds: tokenEmbeds, cache: cache)
+            let (hiddenStates, newCache) = textDecoder.decode(inputsEmbeds: tokenEmbeds, attentionMask: nil, cache: cache)
             cache = newCache
 
             let lastHiddenNext = hiddenStates[0..., (-1)..., .ellipsis]
-            let logits = textDecoder.embedTokens.asLinear(lastHiddenNext)
+            let logits = textDecoder.logits(from: lastHiddenNext)
             nextToken = Self.pickNextToken(
                 logits: logits,
                 generatedSoFar: generatedTokens,
@@ -1216,11 +1220,15 @@ internal enum Qwen3ASRMemory {
 // MARK: - Model Loading
 
 public extension Qwen3ASRModel {
-    /// Load model from HuggingFace hub with automatic weight downloading
+    /// Load model from HuggingFace hub with automatic weight downloading.
+    /// - Parameter dequantizeTextDecoder: load the quantized checkpoint into a float
+    ///   ``FloatTextModel`` (weights dequantized at load time). Faster on hosts without
+    ///   quantized-matmul kernels; costs more memory (float32 weights).
     static func fromPretrained(
         modelId: String = "aufklarer/Qwen3-ASR-0.6B-MLX-4bit",
         cacheDir: URL? = nil,
         offlineMode: Bool = false,
+        dequantizeTextDecoder: Bool = false,
         progressHandler: ((Double, String) -> Void)? = nil
     ) async throws -> Qwen3ASRModel {
         progressHandler?(0.0, "Downloading model...")
@@ -1283,9 +1291,11 @@ public extension Qwen3ASRModel {
         progressHandler?(0.92, "Loading text decoder weights...")
 
         // Initialize and load text decoder
-        model.initializeTextDecoder()
-        if let textDecoder = model.textDecoder {
-            try WeightLoader.loadTextDecoderWeights(into: textDecoder, from: cacheDir)
+        model.initializeTextDecoder(dequantized: dequantizeTextDecoder)
+        if let quantized = model.textDecoder as? QuantizedTextModel {
+            try WeightLoader.loadTextDecoderWeights(into: quantized, from: cacheDir)
+        } else if let floatModel = model.textDecoder as? FloatTextModel {
+            try WeightLoader.loadDequantizedTextDecoderWeights(into: floatModel, from: cacheDir)
         }
 
         MetalBudget.pinMemory()

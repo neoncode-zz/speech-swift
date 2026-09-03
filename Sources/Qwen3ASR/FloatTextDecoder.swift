@@ -16,6 +16,31 @@ public protocol ForcedAlignerTextDecoding: AnyObject {
     ) -> (MLXArray, [(MLXArray, MLXArray)])
 }
 
+/// Text decoder contract used by ``Qwen3ASRModel`` for ASR generation.
+///
+/// Implemented by ``QuantizedTextModel`` (quantized matmuls, fast on Apple Silicon Metal)
+/// and ``FloatTextModel`` (plain matmuls on dequantized weights, the only fast path on
+/// hosts whose MLX backend lacks quantized kernels — e.g. Intel Macs on the CPU backend).
+public protocol Qwen3TextDecoding: ForcedAlignerTextDecoding {
+    var config: TextDecoderConfig { get }
+    /// LM head using the tied embedding weights.
+    func logits(from hiddenStates: MLXArray) -> MLXArray
+    func clearParameters()
+    func parameterMemoryBytes() -> Int
+}
+
+extension QuantizedTextModel: Qwen3TextDecoding {
+    public func logits(from hiddenStates: MLXArray) -> MLXArray {
+        embedTokens.asLinear(hiddenStates)
+    }
+}
+
+extension FloatTextModel: Qwen3TextDecoding {
+    public func logits(from hiddenStates: MLXArray) -> MLXArray {
+        embedTokens.asLinear(hiddenStates)
+    }
+}
+
 extension QuantizedTextModel: ForcedAlignerTextDecoding {
     public func embeddings(for inputIds: MLXArray) -> MLXArray {
         embedTokens(inputIds)

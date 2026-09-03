@@ -160,7 +160,7 @@ struct TDTGreedyDecoder {
     /// Compute log-softmax for a specific token: log_prob = logit[id] - log(sum(exp(logits)))
     /// Uses vDSP for efficient log-sum-exp over the vocabulary.
     private func logSoftmax(_ array: MLMultiArray, tokenId: Int, count: Int, floatBuf: UnsafeMutablePointer<Float>) -> Float {
-        let ptr = array.dataPointer.assumingMemoryBound(to: Float16.self)
+        let ptr = array.dataPointer.assumingMemoryBound(to: OSFloat16.self)
         for i in 0..<count { floatBuf[i] = Float(ptr[i]) }
 
         // log-sum-exp: find max, subtract, exp, sum, log, add max back
@@ -188,14 +188,14 @@ struct TDTGreedyDecoder {
     /// Copy encoder frame at time `t` into the slice buffer using memcpy.
     private func copyEncoderFrame(from encoded: MLMultiArray, at t: Int, to slice: MLMultiArray) {
         let hidden = config.encoderHidden
-        let src = encoded.dataPointer.advanced(by: t * hidden * MemoryLayout<Float16>.stride)
-        memcpy(slice.dataPointer, src, hidden * MemoryLayout<Float16>.stride)
+        let src = encoded.dataPointer.advanced(by: t * hidden * MemoryLayout<OSFloat16>.stride)
+        memcpy(slice.dataPointer, src, hidden * MemoryLayout<OSFloat16>.stride)
     }
 
     /// Find the index of the maximum value in the first `count` elements.
     /// Uses vDSP for large arrays (token logits); scalar for small arrays (duration logits).
     private func argmax(_ array: MLMultiArray, count: Int, floatBuf: UnsafeMutablePointer<Float>?, masked: Set<Int> = []) -> Int {
-        let ptr = array.dataPointer.assumingMemoryBound(to: Float16.self)
+        let ptr = array.dataPointer.assumingMemoryBound(to: OSFloat16.self)
 
         // Small arrays or no buffer: scalar path (duration logits; never masked)
         if count <= 16 || floatBuf == nil {
@@ -224,6 +224,6 @@ struct TDTGreedyDecoder {
 
     /// Zero-fill an MLMultiArray using memset.
     private func zeroFill(_ array: MLMultiArray) {
-        memset(array.dataPointer, 0, array.count * MemoryLayout<Float16>.stride)
+        memset(array.dataPointer, 0, array.count * MemoryLayout<OSFloat16>.stride)
     }
 }
