@@ -1,5 +1,6 @@
 import CoreML
 import Foundation
+import Float16Compat
 import AudioCommon
 
 /// Errors specific to the Canary runtime.
@@ -189,7 +190,7 @@ public class CanaryASRModel {
 
         switch logits.dataType {
         case .float16:
-            return scan(logits.dataPointer.assumingMemoryBound(to: Float16.self))
+            return scan(logits.dataPointer.assumingMemoryBound(to: OSFloat16.self))
         case .double:
             return scan(logits.dataPointer.assumingMemoryBound(to: Float64.self))
         default:

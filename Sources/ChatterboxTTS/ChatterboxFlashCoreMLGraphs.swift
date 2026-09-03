@@ -2,6 +2,7 @@
 import AudioCommon
 import CoreML
 import Foundation
+import Float16Compat
 import MLX
 
 enum ChatterboxFlashCoreMLBridge {
@@ -83,7 +84,7 @@ enum ChatterboxFlashCoreMLBridge {
             return offsets.map { ptr[$0] }
         case .float16:
             let ptr = arr.dataPointer.bindMemory(to: UInt16.self, capacity: storageCount)
-            return offsets.map { Float(Float16(bitPattern: ptr[$0])) }
+            return offsets.map { Float(OSFloat16(bitPattern: ptr[$0])) }
         case .double:
             let ptr = arr.dataPointer.bindMemory(to: Double.self, capacity: storageCount)
             return offsets.map { Float(ptr[$0]) }

@@ -2,6 +2,7 @@
 import AudioCommon
 import CoreML
 import Foundation
+import Float16Compat
 
 /// The two fixed-shape neural stages from the Community-1 bundle.
 final class Community1CoreMLModels {
@@ -210,7 +211,7 @@ final class Community1CoreMLModels {
             let pointer = array.dataPointer.assumingMemoryBound(to: Float.self)
             return Array(UnsafeBufferPointer(start: pointer, count: expectedCount))
         case .float16:
-            let pointer = array.dataPointer.assumingMemoryBound(to: Float16.self)
+            let pointer = array.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             return (0..<expectedCount).map { Float(pointer[$0]) }
         case .double:
             let pointer = array.dataPointer.assumingMemoryBound(to: Double.self)

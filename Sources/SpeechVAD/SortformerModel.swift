@@ -1,6 +1,7 @@
 #if canImport(CoreML)
 import CoreML
 import Foundation
+import Float16Compat
 import AudioCommon
 
 /// CoreML wrapper for the Sortformer streaming diarization model.
@@ -151,7 +152,7 @@ final class SortformerCoreMLModel {
 
         switch array.dataType {
         case .float16:
-            let ptr = array.dataPointer.assumingMemoryBound(to: Float16.self)
+            let ptr = array.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             fill { Float(ptr[$0]) }
         case .float32:
             let ptr = array.dataPointer.assumingMemoryBound(to: Float.self)

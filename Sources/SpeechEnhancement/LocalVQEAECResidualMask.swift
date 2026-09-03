@@ -1,6 +1,7 @@
 import AudioCommon
 import CoreML
 import Foundation
+import Float16Compat
 
 protocol LocalVQEAECResidualMasking: AnyObject {
     func reset()
@@ -89,9 +90,9 @@ final class LocalVQEAECResidualMask: LocalVQEAECResidualMasking {
     }
 
     private func write(_ values: [Float], to array: MLMultiArray) {
-        let pointer = array.dataPointer.assumingMemoryBound(to: Float16.self)
+        let pointer = array.dataPointer.assumingMemoryBound(to: OSFloat16.self)
         for index in values.indices {
-            pointer[index] = Float16(values[index])
+            pointer[index] = OSFloat16(values[index])
         }
     }
 
@@ -99,7 +100,7 @@ final class LocalVQEAECResidualMask: LocalVQEAECResidualMasking {
         var result = [Float](repeating: 0, count: array.count)
         switch array.dataType {
         case .float16:
-            let pointer = array.dataPointer.assumingMemoryBound(to: Float16.self)
+            let pointer = array.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             for index in result.indices {
                 result[index] = Float(pointer[index])
             }

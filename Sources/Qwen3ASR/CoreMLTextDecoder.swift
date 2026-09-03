@@ -1,6 +1,7 @@
 #if canImport(CoreML)
 import CoreML
 import Foundation
+import Float16Compat
 import MLX
 import AudioCommon
 

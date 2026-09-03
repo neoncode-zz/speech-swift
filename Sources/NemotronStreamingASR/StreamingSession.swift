@@ -1,5 +1,6 @@
 import CoreML
 import Foundation
+import Float16Compat
 import AudioCommon
 
 /// A Nemotron streaming ASR session that processes audio chunks incrementally
@@ -323,14 +324,14 @@ public class StreamingSession {
 
     static func copyCastFP16ToFP32(_ src: MLMultiArray, into dst: MLMultiArray) {
         let count = src.count
-        let srcPtr = src.dataPointer.assumingMemoryBound(to: Float16.self)
+        let srcPtr = src.dataPointer.assumingMemoryBound(to: OSFloat16.self)
         let dstPtr = dst.dataPointer.assumingMemoryBound(to: Float.self)
         for i in 0..<count { dstPtr[i] = Float(srcPtr[i]) }
     }
 
     private func truncateMel(_ mel: MLMultiArray, to targetFrames: Int) throws -> MLMultiArray {
         let numMelBins = config.numMelBins
-        let stride = mel.dataType == .float16 ? MemoryLayout<Float16>.stride : MemoryLayout<Float>.stride
+        let stride = mel.dataType == .float16 ? MemoryLayout<OSFloat16>.stride : MemoryLayout<Float>.stride
         let truncated = try MLMultiArray(
             shape: [1, numMelBins as NSNumber, targetFrames as NSNumber], dataType: mel.dataType)
         let actualFrames = mel.shape[2].intValue
@@ -346,7 +347,7 @@ public class StreamingSession {
 
     private func padMel(_ mel: MLMultiArray, actualLength: Int, targetLength: Int) throws -> MLMultiArray {
         let numMelBins = config.numMelBins
-        let stride = mel.dataType == .float16 ? MemoryLayout<Float16>.stride : MemoryLayout<Float>.stride
+        let stride = mel.dataType == .float16 ? MemoryLayout<OSFloat16>.stride : MemoryLayout<Float>.stride
         let padded = try MLMultiArray(
             shape: [1, numMelBins as NSNumber, targetLength as NSNumber], dataType: mel.dataType)
         for bin in 0..<numMelBins {

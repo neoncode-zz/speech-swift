@@ -1,6 +1,7 @@
 #if canImport(CoreML)
 import CoreML
 import Foundation
+import Float16Compat
 
 /// CoreML text token → embedding [1, 1024, 1, 1].
 /// Replaces Swift-side text_embedding + FC1→SiLU→FC2 projection.
@@ -64,7 +65,7 @@ func readMLFloat(_ arr: MLMultiArray, _ logicalIdx: Int) -> Float {
     let stride = arr.strides[0].intValue
     let physIdx = logicalIdx * stride
     if arr.dataType == .float16 {
-        return Float(arr.dataPointer.assumingMemoryBound(to: Float16.self)[physIdx])
+        return Float(arr.dataPointer.assumingMemoryBound(to: OSFloat16.self)[physIdx])
     } else {
         return arr.dataPointer.assumingMemoryBound(to: Float.self)[physIdx]
     }
@@ -75,19 +76,19 @@ func readMLFloat(_ arr: MLMultiArray, _ logicalIdx: Int) -> Float {
 func addMLMultiArrays(_ a: MLMultiArray, _ b: MLMultiArray) -> MLMultiArray {
     let channels = a.shape[1].intValue  // [1, C, 1, 1]
     let result = try! MLMultiArray(shape: [1, NSNumber(value: channels), 1, 1], dataType: .float16)
-    let rp = result.dataPointer.assumingMemoryBound(to: Float16.self)
+    let rp = result.dataPointer.assumingMemoryBound(to: OSFloat16.self)
 
     // Read each input respecting its data type
     func read(_ arr: MLMultiArray, _ i: Int) -> Float {
         if arr.dataType == .float32 {
             return arr.dataPointer.assumingMemoryBound(to: Float.self)[i]
         } else {
-            return Float(arr.dataPointer.assumingMemoryBound(to: Float16.self)[i])
+            return Float(arr.dataPointer.assumingMemoryBound(to: OSFloat16.self)[i])
         }
     }
 
     for i in 0..<channels {
-        rp[i] = Float16(read(a, i) + read(b, i))
+        rp[i] = OSFloat16(read(a, i) + read(b, i))
     }
     return result
 }
@@ -97,7 +98,7 @@ func addMLMultiArrays(_ a: MLMultiArray, _ b: MLMultiArray) -> MLMultiArray {
 /// This copies data respecting strides into a contiguous buffer.
 func ensureNCHW(_ array: MLMultiArray, channels: Int) -> MLMultiArray {
     let result = try! MLMultiArray(shape: [1, NSNumber(value: channels), 1, 1], dataType: .float16)
-    let dst = result.dataPointer.assumingMemoryBound(to: Float16.self)
+    let dst = result.dataPointer.assumingMemoryBound(to: OSFloat16.self)
 
     // Check if strides indicate non-contiguous layout
     let strides = array.strides.map { $0.intValue }
@@ -115,7 +116,7 @@ func ensureNCHW(_ array: MLMultiArray, channels: Int) -> MLMultiArray {
         else if ndim == 4 { idx[1] = i as NSNumber } // [1, C, 1, 1]
         else { idx[0] = i as NSNumber }
         let val = array[idx]
-        dst[i] = Float16(val.floatValue)
+        dst[i] = OSFloat16(val.floatValue)
     }
     return result
 }

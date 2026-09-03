@@ -1,6 +1,7 @@
 #if canImport(CoreML)
 import CoreML
 import Foundation
+import Float16Compat
 
 /// Pure-Swift token sampler for CoreML TTS inference (no MLX dependency).
 ///
@@ -106,7 +107,7 @@ enum TTSSampler {
 
         var result = [Float](repeating: 0, count: vocabSize)
         if array.dataType == .float16 {
-            let ptr = array.dataPointer.assumingMemoryBound(to: Float16.self)
+            let ptr = array.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             for i in 0..<vocabSize {
                 result[i] = Float(ptr[lastPosOffset + i])
             }

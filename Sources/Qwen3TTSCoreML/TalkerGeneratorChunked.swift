@@ -1,6 +1,7 @@
 #if canImport(CoreML)
 import CoreML
 import Foundation
+import Float16Compat
 
 /// Chunked ANE-friendly CodeDecoder runner.
 ///
@@ -70,19 +71,19 @@ final class TalkerGeneratorChunked {
         currentPos = 0
     }
 
-    func forward(embedArray: MLMultiArray) throws -> (logits: [Float], hidden: [Float16]) {
+    func forward(embedArray: MLMultiArray) throws -> (logits: [Float], hidden: [OSFloat16]) {
         return try forwardInternal(inputEmbeds: ensureNCHW(embedArray, channels: hiddenSize))
     }
 
-    func forward(embed: [Float16]) throws -> (logits: [Float], hidden: [Float16]) {
+    func forward(embed: [OSFloat16]) throws -> (logits: [Float], hidden: [OSFloat16]) {
         let inputEmbeds = try MLMultiArray(
             shape: [1, NSNumber(value: hiddenSize), 1, 1], dataType: .float16)
-        let embPtr = inputEmbeds.dataPointer.assumingMemoryBound(to: Float16.self)
+        let embPtr = inputEmbeds.dataPointer.assumingMemoryBound(to: OSFloat16.self)
         for i in 0..<hiddenSize { embPtr[i] = embed[i] }
         return try forwardInternal(inputEmbeds: inputEmbeds)
     }
 
-    private func forwardInternal(inputEmbeds: MLMultiArray) throws -> (logits: [Float], hidden: [Float16]) {
+    private func forwardInternal(inputEmbeds: MLMultiArray) throws -> (logits: [Float], hidden: [OSFloat16]) {
         guard currentPos < maxSeqLen else { throw TalkerError.cacheFull }
 
         let (keyMask, updateMask, cacheLen) = try makeMasks(position: currentPos)
@@ -114,19 +115,19 @@ final class TalkerGeneratorChunked {
             idx[ndim - 1] = i as NSNumber
             logits[i] = logitsArray[idx].floatValue
         }
-        var hidden = [Float16](repeating: 0, count: hiddenSize)
+        var hidden = [OSFloat16](repeating: 0, count: hiddenSize)
         let hndim = hiddenArray.shape.count
         for i in 0..<hiddenSize {
             var idx = [NSNumber](repeating: 0, count: hndim)
             if hndim >= 4 { idx[1] = i as NSNumber } else { idx[0] = i as NSNumber }
-            hidden[i] = Float16(hiddenArray[idx].floatValue)
+            hidden[i] = OSFloat16(hiddenArray[idx].floatValue)
         }
         return (logits, hidden)
     }
 
-    func prefill(embeds: [[Float16]]) throws -> (logits: [Float], hidden: [Float16]) {
+    func prefill(embeds: [[OSFloat16]]) throws -> (logits: [Float], hidden: [OSFloat16]) {
         var lastLogits = [Float]()
-        var lastHidden = [Float16]()
+        var lastHidden = [OSFloat16]()
         for embed in embeds {
             (lastLogits, lastHidden) = try forward(embed: embed)
         }
@@ -164,19 +165,19 @@ final class TalkerGeneratorChunked {
         cacheLen.dataPointer.assumingMemoryBound(to: Int32.self)[0] = Int32(position)
 
         let keyMask = try MLMultiArray(shape: [1, NSNumber(value: maxSeqLen)], dataType: .float16)
-        let kPtr = keyMask.dataPointer.assumingMemoryBound(to: Float16.self)
-        for i in 0..<maxSeqLen { kPtr[i] = i <= position ? Float16(0) : Float16(-1e4) }
+        let kPtr = keyMask.dataPointer.assumingMemoryBound(to: OSFloat16.self)
+        for i in 0..<maxSeqLen { kPtr[i] = i <= position ? OSFloat16(0) : OSFloat16(-1e4) }
 
         let updateMask = try MLMultiArray(shape: [1, NSNumber(value: maxSeqLen)], dataType: .float16)
         memset(updateMask.dataPointer, 0, maxSeqLen * 2)
-        updateMask.dataPointer.assumingMemoryBound(to: Float16.self)[position] = Float16(1.0)
+        updateMask.dataPointer.assumingMemoryBound(to: OSFloat16.self)[position] = OSFloat16(1.0)
         return (keyMask, updateMask, cacheLen)
     }
 
     private func scatterWrite(into cache: MLMultiArray, slots: MLMultiArray, position: Int) {
         let channels = cache.shape[1].intValue
-        let cachePtr = cache.dataPointer.assumingMemoryBound(to: Float16.self)
-        let slotPtr = slots.dataPointer.assumingMemoryBound(to: Float16.self)
+        let cachePtr = cache.dataPointer.assumingMemoryBound(to: OSFloat16.self)
+        let slotPtr = slots.dataPointer.assumingMemoryBound(to: OSFloat16.self)
         for c in 0..<channels {
             cachePtr[c * maxSeqLen + position] = slotPtr[c]
         }
@@ -193,8 +194,8 @@ final class TalkerGeneratorChunked {
 protocol CodeDecoderInterface: AnyObject {
     var lastHiddenState: MLMultiArray? { get }
     func resetCache()
-    func forward(embedArray: MLMultiArray) throws -> (logits: [Float], hidden: [Float16])
-    func forward(embed: [Float16]) throws -> (logits: [Float], hidden: [Float16])
+    func forward(embedArray: MLMultiArray) throws -> (logits: [Float], hidden: [OSFloat16])
+    func forward(embed: [OSFloat16]) throws -> (logits: [Float], hidden: [OSFloat16])
 }
 
 extension TalkerGenerator: CodeDecoderInterface {}

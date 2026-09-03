@@ -1,5 +1,6 @@
 import CoreML
 import Foundation
+import Float16Compat
 import AudioCommon
 
 /// CoreML wrapper for Kokoro-82M end-to-end TTS inference.
@@ -76,7 +77,7 @@ class KokoroNetwork {
 
         let lengthSamples: Int
         if audioLen.dataType == .float16 {
-            lengthSamples = Int(Float(audioLen.dataPointer.assumingMemoryBound(to: Float16.self).pointee))
+            lengthSamples = Int(Float(audioLen.dataPointer.assumingMemoryBound(to: OSFloat16.self).pointee))
         } else if audioLen.dataType == .int32 {
             lengthSamples = Int(audioLen.dataPointer.assumingMemoryBound(to: Int32.self).pointee)
         } else {

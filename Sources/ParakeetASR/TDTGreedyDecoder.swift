@@ -1,6 +1,7 @@
 import Accelerate
 import CoreML
 import Foundation
+import Float16Compat
 
 /// Reusable MLFeatureProvider that avoids dictionary allocation on every CoreML prediction.
 /// Backing MLMultiArray references can be updated via `update(_:_:)` when the underlying

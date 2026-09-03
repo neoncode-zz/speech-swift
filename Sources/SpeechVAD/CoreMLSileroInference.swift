@@ -2,6 +2,7 @@
 import AudioCommon
 import CoreML
 import Foundation
+import Float16Compat
 
 extension SileroVADModel {
 

@@ -1,5 +1,6 @@
 import CoreML
 import Foundation
+import Float16Compat
 import AudioCommon
 
 /// Kokoro-82M text-to-speech — CoreML-based, runs on Neural Engine.

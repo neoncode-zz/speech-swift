@@ -1,6 +1,7 @@
 #if canImport(CoreML)
 import CoreML
 import Foundation
+import Float16Compat
 
 /// Common interface so the synthesise loop can hold either the monolithic
 /// (legacy ``MultiCodeDecoderCoreML``) or the chunked ANE form behind a
@@ -189,12 +190,12 @@ final class MultiCodeDecoderChunked: MultiCodeDecoderInterface {
         cacheLen.dataPointer.assumingMemoryBound(to: Int32.self)[0] = Int32(position)
 
         let keyMask = try MLMultiArray(shape: [1, NSNumber(value: maxSeqLen)], dataType: .float16)
-        let kPtr = keyMask.dataPointer.assumingMemoryBound(to: Float16.self)
-        for i in 0..<maxSeqLen { kPtr[i] = i <= position ? Float16(0) : Float16(-1e4) }
+        let kPtr = keyMask.dataPointer.assumingMemoryBound(to: OSFloat16.self)
+        for i in 0..<maxSeqLen { kPtr[i] = i <= position ? OSFloat16(0) : OSFloat16(-1e4) }
 
         let updateMask = try MLMultiArray(shape: [1, NSNumber(value: maxSeqLen)], dataType: .float16)
         memset(updateMask.dataPointer, 0, maxSeqLen * 2)
-        updateMask.dataPointer.assumingMemoryBound(to: Float16.self)[position] = Float16(1.0)
+        updateMask.dataPointer.assumingMemoryBound(to: OSFloat16.self)[position] = OSFloat16(1.0)
         return (keyMask, updateMask, cacheLen)
     }
 
@@ -204,8 +205,8 @@ final class MultiCodeDecoderChunked: MultiCodeDecoderInterface {
     private func scatterWrite(into cache: MLMultiArray, slots: MLMultiArray, position: Int) {
         let channels = cache.shape[1].intValue
         precondition(slots.shape[1].intValue == channels, "slot channel mismatch")
-        let cachePtr = cache.dataPointer.assumingMemoryBound(to: Float16.self)
-        let slotPtr = slots.dataPointer.assumingMemoryBound(to: Float16.self)
+        let cachePtr = cache.dataPointer.assumingMemoryBound(to: OSFloat16.self)
+        let slotPtr = slots.dataPointer.assumingMemoryBound(to: OSFloat16.self)
         // Memory layout for NCHW with H=1 and S in W:
         //   cache[c, s] is at offset c * S + s
         //   slot[c]     is at offset c

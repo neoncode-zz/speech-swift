@@ -2,6 +2,7 @@
 import Accelerate
 import CoreML
 import Foundation
+import Float16Compat
 import AudioCommon
 
 /// Forced aligner running entirely on CoreML (Neural Engine + GPU).
@@ -347,7 +348,7 @@ public final class CoreMLForcedAligner {
             // vImage's vImageConvert_Planar16FtoPlanarF unpacks fp16→fp32 on
             // CPU SIMD in one shot. Doing it row by row keeps the call within
             // the destination's row padding without spilling into the next row.
-            let srcPtr = audioEmbeds.dataPointer.assumingMemoryBound(to: Float16.self)
+            let srcPtr = audioEmbeds.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             for t in 0..<audioTokenCount {
                 let dstRow = dstPtr.advanced(by: (tokenStart + t) * dstPosStride)
                 let srcRow = srcPtr.advanced(by: t * srcPosStride)
@@ -355,7 +356,7 @@ public final class CoreMLForcedAligner {
                     data: UnsafeMutableRawPointer(mutating: srcRow),
                     height: 1,
                     width: vImagePixelCount(hiddenSize),
-                    rowBytes: hiddenSize * MemoryLayout<Float16>.stride)
+                    rowBytes: hiddenSize * MemoryLayout<OSFloat16>.stride)
                 var dstBuf = vImage_Buffer(
                     data: dstRow,
                     height: 1,
@@ -398,7 +399,7 @@ public final class CoreMLForcedAligner {
                 out.append(bestIdx)
             }
         case .float16:
-            let p = logits.dataPointer.assumingMemoryBound(to: Float16.self)
+            let p = logits.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             for pos in positions {
                 let base = pos * posStride
                 var best = -Float.greatestFiniteMagnitude
@@ -529,7 +530,7 @@ public final class CoreMLForcedAlignerEmbedding {
         // Memory-map the binary so multiple aligners can share pages and we
         // don't double the RSS by reading the file into RAM.
         self.table = try Data(contentsOf: fileURL, options: [.mappedIfSafe])
-        let expected = vocabSize * hiddenSize * MemoryLayout<Float16>.stride
+        let expected = vocabSize * hiddenSize * MemoryLayout<OSFloat16>.stride
         guard table.count == expected else {
             throw AudioModelError.modelLoadFailed(
                 modelId: fileURL.lastPathComponent,
@@ -582,11 +583,11 @@ public final class CoreMLForcedAlignerEmbedding {
         let dstPosStride = dstStrides[1]
         let dst = fp32.dataPointer.assumingMemoryBound(to: Float.self)
 
-        let rowFp16Bytes = hiddenSize * MemoryLayout<Float16>.stride
+        let rowFp16Bytes = hiddenSize * MemoryLayout<OSFloat16>.stride
         let rowFp32Bytes = hiddenSize * MemoryLayout<Float>.stride
 
         table.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
-            guard let basePtr = raw.baseAddress?.assumingMemoryBound(to: Float16.self) else {
+            guard let basePtr = raw.baseAddress?.assumingMemoryBound(to: OSFloat16.self) else {
                 return
             }
             for t in 0..<fixedT {

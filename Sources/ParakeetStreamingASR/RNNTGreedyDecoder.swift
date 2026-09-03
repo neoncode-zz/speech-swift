@@ -2,6 +2,7 @@ import Accelerate
 import AudioCommon
 import CoreML
 import Foundation
+import Float16Compat
 
 /// Reusable MLFeatureProvider that avoids dictionary allocation on every CoreML prediction.
 class ReusableFeatureProvider: MLFeatureProvider {
@@ -128,7 +129,7 @@ struct RNNTGreedyDecoder {
     private func copyEncoderFrameFP16(from encoded: MLMultiArray, at t: Int, toFP32 slice: MLMultiArray) {
         let hidden = config.encoderHidden
         // encoded is [1, T, D] fp16 — frame t is contiguous at offset t * D
-        let src = encoded.dataPointer.assumingMemoryBound(to: Float16.self).advanced(by: t * hidden)
+        let src = encoded.dataPointer.assumingMemoryBound(to: OSFloat16.self).advanced(by: t * hidden)
         let dst = slice.dataPointer.assumingMemoryBound(to: Float.self)
         for i in 0..<hidden { dst[i] = Float(src[i]) }
     }
@@ -165,7 +166,7 @@ struct RNNTGreedyDecoder {
 
     /// Load `count` elements from a fp16 MLMultiArray into a fp32 buffer.
     private func loadFP16AsFloat(_ array: MLMultiArray, count: Int, into buf: UnsafeMutablePointer<Float>) {
-        let ptr = array.dataPointer.assumingMemoryBound(to: Float16.self)
+        let ptr = array.dataPointer.assumingMemoryBound(to: OSFloat16.self)
         for i in 0..<count { buf[i] = Float(ptr[i]) }
     }
 }

@@ -1,6 +1,7 @@
 #if canImport(CoreML)
 import CoreML
 import Foundation
+import Float16Compat
 
 /// CoreML batch speech decoder: 16 codebooks → 24kHz audio.
 /// Fixed T=125 frames (10s max). Pads shorter sequences, trims output.
@@ -40,7 +41,7 @@ final class SpeechDecoderCoreML {
         let totalSamples = min(numFrames * samplesPerFrame, audioArray.count)
         var audio = [Float](repeating: 0, count: totalSamples)
         if audioArray.dataType == .float16 {
-            let src = audioArray.dataPointer.assumingMemoryBound(to: Float16.self)
+            let src = audioArray.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             for i in 0..<totalSamples { audio[i] = Float(src[i]) }
         } else {
             let src = audioArray.dataPointer.assumingMemoryBound(to: Float.self)

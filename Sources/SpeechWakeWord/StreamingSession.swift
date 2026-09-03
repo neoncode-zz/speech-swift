@@ -1,5 +1,6 @@
 import CoreML
 import Foundation
+import Float16Compat
 import AudioCommon
 
 struct ResolvedWakeWordDecodingOptions: Equatable {
@@ -317,7 +318,7 @@ public final class WakeWordSession {
             let ptr = array.dataPointer.assumingMemoryBound(to: Float.self)
             floats = Array(UnsafeBufferPointer(start: ptr, count: count))
         case .float16:
-            let ptr = array.dataPointer.assumingMemoryBound(to: Float16.self)
+            let ptr = array.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             var out = [Float](repeating: 0, count: count)
             for i in 0..<count { out[i] = Float(ptr[i]) }
             floats = out
@@ -374,10 +375,10 @@ public final class WakeWordSession {
 
     private static func copyFloatsToFloat16(_ src: [Float], into array: MLMultiArray) {
         let count = min(src.count, array.count)
-        let halves = array.dataPointer.assumingMemoryBound(to: Float16.self)
+        let halves = array.dataPointer.assumingMemoryBound(to: OSFloat16.self)
         src.withUnsafeBufferPointer { buf in
             for i in 0..<count {
-                halves[i] = Float16(buf[i])
+                halves[i] = OSFloat16(buf[i])
             }
         }
     }
@@ -389,7 +390,7 @@ public final class WakeWordSession {
             let ptr = array.dataPointer.assumingMemoryBound(to: Float.self)
             return Array(UnsafeBufferPointer(start: ptr, count: count))
         case .float16:
-            let ptr = array.dataPointer.assumingMemoryBound(to: Float16.self)
+            let ptr = array.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             var out = [Float](repeating: 0, count: count)
             for i in 0..<count { out[i] = Float(ptr[i]) }
             return out
@@ -398,5 +399,5 @@ public final class WakeWordSession {
         }
     }
 
-    fileprivate static func halfToFloat(_ h: Float16) -> Float { Float(h) }
+    fileprivate static func halfToFloat(_ h: OSFloat16) -> Float { Float(h) }
 }

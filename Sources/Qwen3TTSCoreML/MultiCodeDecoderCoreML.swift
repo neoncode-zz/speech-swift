@@ -1,6 +1,7 @@
 #if canImport(CoreML)
 import CoreML
 import Foundation
+import Float16Compat
 
 /// CoreML MultiCodeDecoder: autoregressive CB1-15 prediction.
 /// 5-layer transformer with 15 lm_heads, scatter-write KV cache.
@@ -89,12 +90,12 @@ final class MultiCodeDecoderCoreML {
         cacheLen.dataPointer.assumingMemoryBound(to: Int32.self)[0] = Int32(position)
 
         let keyMask = try MLMultiArray(shape: [1, NSNumber(value: maxSeqLen)], dataType: .float16)
-        let maskPtr = keyMask.dataPointer.assumingMemoryBound(to: Float16.self)
-        for i in 0..<maxSeqLen { maskPtr[i] = i <= position ? Float16(0) : Float16(-1e4) }
+        let maskPtr = keyMask.dataPointer.assumingMemoryBound(to: OSFloat16.self)
+        for i in 0..<maxSeqLen { maskPtr[i] = i <= position ? OSFloat16(0) : OSFloat16(-1e4) }
 
         let updateMask = try MLMultiArray(shape: [1, NSNumber(value: maxSeqLen)], dataType: .float16)
         memset(updateMask.dataPointer, 0, maxSeqLen * 2)
-        updateMask.dataPointer.assumingMemoryBound(to: Float16.self)[position] = Float16(1.0)
+        updateMask.dataPointer.assumingMemoryBound(to: OSFloat16.self)[position] = OSFloat16(1.0)
 
         var inputs: [String: MLFeatureValue] = [
             "input_embeds": MLFeatureValue(multiArray: embed),

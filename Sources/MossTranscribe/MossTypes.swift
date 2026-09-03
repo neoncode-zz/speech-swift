@@ -1,5 +1,6 @@
 import AudioCommon
 import Foundation
+import Float16Compat
 
 /// Published Core ML variants supported by the native MOSS runtime.
 public enum MossModelVariant: String, CaseIterable, Sendable {
@@ -105,14 +106,14 @@ public enum MossMLXCacheMemory {
             tokenCount * layers * 2 * keyValueHeads * headDimension
         switch precision {
         case .float16:
-            return elementCount * MemoryLayout<Float16>.stride
+            return elementCount * MemoryLayout<OSFloat16>.stride
         case .int8:
             let packedBits = elementCount * precision.bitsPerElement
             let packedBytes = (packedBits + 7) / 8
             let groups = (elementCount + max(groupSize, 1) - 1)
                 / max(groupSize, 1)
             let affineMetadataBytes =
-                groups * 2 * MemoryLayout<Float16>.stride
+                groups * 2 * MemoryLayout<OSFloat16>.stride
             return packedBytes + affineMetadataBytes
         }
     }

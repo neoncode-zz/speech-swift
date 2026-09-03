@@ -1,5 +1,6 @@
 import CoreML
 import Foundation
+import Float16Compat
 import AudioCommon
 import os.log
 
@@ -365,7 +366,7 @@ public final class Qwen35CoreMLChat: @unchecked Sendable {
             let ptr = logitsArray.dataPointer.bindMemory(to: Float.self, capacity: vocabSize)
             logits = Array(UnsafeBufferPointer(start: ptr, count: vocabSize))
         } else {
-            let ptr = logitsArray.dataPointer.bindMemory(to: Float16.self, capacity: vocabSize)
+            let ptr = logitsArray.dataPointer.bindMemory(to: OSFloat16.self, capacity: vocabSize)
             logits = (0..<vocabSize).map { Float(ptr[$0]) }
         }
         return logits

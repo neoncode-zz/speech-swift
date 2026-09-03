@@ -1,6 +1,7 @@
 #if canImport(CoreML)
 import CoreML
 import Foundation
+import Float16Compat
 import AudioCommon
 
 /// Qwen3-TTS CoreML inference with 6-model ANE-optimized architecture.
@@ -266,7 +267,7 @@ public final class Qwen3TTSCoreMLModel {
             // Add CB0 embedding
             let tEmb0 = CFAbsoluteTimeGetCurrent()
             let cb0Emb = ensureNCHW(try codeEmbedder.embed(Int(nextToken)), channels: hiddenSize)
-            let cb0Ptr = cb0Emb.dataPointer.assumingMemoryBound(to: Float16.self)
+            let cb0Ptr = cb0Emb.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             for i in 0..<hiddenSize { sum32[i] += Float(cb0Ptr[i]) }
 
             // Add CB1-15 embeddings
@@ -274,7 +275,7 @@ public final class Qwen3TTSCoreMLModel {
                 let mceEmb = ensureNCHW(
                     try multiCodeEmbedder.embed(codebookIdx: cbIdx, tokenId: Int(token)),
                     channels: hiddenSize)
-                let ptr = mceEmb.dataPointer.assumingMemoryBound(to: Float16.self)
+                let ptr = mceEmb.dataPointer.assumingMemoryBound(to: OSFloat16.self)
                 for i in 0..<hiddenSize { sum32[i] += Float(ptr[i]) }
             }
             embedSec += CFAbsoluteTimeGetCurrent() - tEmb0
@@ -284,14 +285,14 @@ public final class Qwen3TTSCoreMLModel {
                 let padPtr = ttsPadEmbed.dataPointer.assumingMemoryBound(to: Float.self)
                 for i in 0..<hiddenSize { sum32[i] += padPtr[i] }
             } else {
-                let padPtr = ttsPadEmbed.dataPointer.assumingMemoryBound(to: Float16.self)
+                let padPtr = ttsPadEmbed.dataPointer.assumingMemoryBound(to: OSFloat16.self)
                 for i in 0..<hiddenSize { sum32[i] += Float(padPtr[i]) }
             }
 
             // Cast to FP16 for model input
             let stepInput = try MLMultiArray(shape: [1, NSNumber(value: hiddenSize), 1, 1], dataType: .float16)
-            let outPtr = stepInput.dataPointer.assumingMemoryBound(to: Float16.self)
-            for i in 0..<hiddenSize { outPtr[i] = Float16(sum32[i]) }
+            let outPtr = stepInput.dataPointer.assumingMemoryBound(to: OSFloat16.self)
+            for i in 0..<hiddenSize { outPtr[i] = OSFloat16(sum32[i]) }
 
             // CodeDecoder forward
             let tCd = CFAbsoluteTimeGetCurrent()

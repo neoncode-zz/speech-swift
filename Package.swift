@@ -343,6 +343,7 @@ let package = Package(
         .target(
             name: "Qwen3TTSCoreML",
             dependencies: [
+                "Float16Compat",
                 "AudioCommon",
             ]
         ),
@@ -521,6 +522,7 @@ let package = Package(
         .target(
             name: "SpeechRestoration",
             dependencies: [
+                "Float16Compat",
                 "AudioCommon",
             ]
         ),
@@ -537,6 +539,7 @@ let package = Package(
         .target(
             name: "CanaryASR",
             dependencies: [
+                "Float16Compat",
                 "AudioCommon",
             ]
         ),
@@ -550,12 +553,14 @@ let package = Package(
         .target(
             name: "ParakeetStreamingASR",
             dependencies: [
+                "Float16Compat",
                 "AudioCommon",
             ]
         ),
         .target(
             name: "NemotronStreamingASR",
             dependencies: [
+                "Float16Compat",
                 "AudioCommon",
                 "MLXCommon",
                 .product(name: "MLX", package: "mlx-swift"),
@@ -685,6 +690,7 @@ let package = Package(
         .target(
             name: "Qwen3Chat",
             dependencies: [
+                "Float16Compat",
                 "AudioCommon",
                 "MLXCommon",
                 .product(name: "MLX", package: "mlx-swift"),
@@ -695,6 +701,7 @@ let package = Package(
         .target(
             name: "FunctionGemma",
             dependencies: [
+                "Float16Compat",
                 "AudioCommon",
                 .product(name: "Hub", package: "swift-transformers"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
@@ -717,17 +724,19 @@ let package = Package(
         ),
         .target(
             name: "SpeechWakeWord",
-            dependencies: ["AudioCommon"]
+            dependencies: ["AudioCommon", "Float16Compat"]
         ),
         .target(
             name: "WhisperASR",
             dependencies: [
+                "Float16Compat",
                 "AudioCommon"
             ]
         ),
         .target(
             name: "MossTranscribe",
             dependencies: [
+                "Float16Compat",
                 "AudioCommon",
                 "MLXCommon",
                 .product(name: "MLX", package: "mlx-swift"),

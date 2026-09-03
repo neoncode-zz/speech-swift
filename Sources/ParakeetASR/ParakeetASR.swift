@@ -194,8 +194,8 @@ public class ParakeetASRModel {
     /// mel into a fresh `[1, 128, length]` array (bin-major Float16 layout).
     private func sliceMel(mel: MLMultiArray, start: Int, length: Int, totalFrames: Int) throws -> MLMultiArray {
         let sub = try MLMultiArray(shape: [1, 128, length as NSNumber], dataType: mel.dataType)
-        let srcPtr = mel.dataPointer.assumingMemoryBound(to: Float16.self)
-        let dstPtr = sub.dataPointer.assumingMemoryBound(to: Float16.self)
+        let srcPtr = mel.dataPointer.assumingMemoryBound(to: OSFloat16.self)
+        let dstPtr = sub.dataPointer.assumingMemoryBound(to: OSFloat16.self)
         for bin in 0..<config.numMelBins {
             dstPtr.advanced(by: bin * length)
                 .update(from: srcPtr.advanced(by: bin * totalFrames + start), count: length)
@@ -278,8 +278,8 @@ public class ParakeetASRModel {
         let dropPrefix = melFrames - targetLength
         let truncated = try MLMultiArray(
             shape: [1, 128, targetLength as NSNumber], dataType: mel.dataType)
-        let srcPtr = mel.dataPointer.assumingMemoryBound(to: Float16.self)
-        let dstPtr = truncated.dataPointer.assumingMemoryBound(to: Float16.self)
+        let srcPtr = mel.dataPointer.assumingMemoryBound(to: OSFloat16.self)
+        let dstPtr = truncated.dataPointer.assumingMemoryBound(to: OSFloat16.self)
         let numMelBins = config.numMelBins
         for bin in 0..<numMelBins {
             let srcOffset = bin * melFrames + dropPrefix

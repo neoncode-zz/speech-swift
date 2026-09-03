@@ -1,6 +1,7 @@
 import AudioCommon
 import CoreML
 import Foundation
+import Float16Compat
 import Tokenizers
 
 struct MossDecoderConfiguration: Decodable, Sendable {
@@ -246,7 +247,7 @@ public final class MossTranscribeModel: SpeechRecognitionModel, @unchecked Senda
     private let decoderConfiguration: MossDecoderConfiguration
     private let featureExtractor = MossWhisperFeatureExtractor()
     private let inferenceLock = NSLock()
-    private var embeddingCache: [Int: [Float16]] = [:]
+    private var embeddingCache: [Int: [OSFloat16]] = [:]
 
     private init(
         modelId: String,
@@ -525,7 +526,7 @@ public final class MossTranscribeModel: SpeechRecognitionModel, @unchecked Senda
             let maximum = decoderConfiguration
                 .enumeratedTokenLengths.max() ?? 1
             let prefillLength = min(128, maximum)
-            var embeddings = [Float16](
+            var embeddings = [OSFloat16](
                 repeating: 0,
                 count: prefillLength * decoderConfiguration.hiddenSize
             )
@@ -641,7 +642,7 @@ public final class MossTranscribeModel: SpeechRecognitionModel, @unchecked Senda
             )
         }
 
-        var audioEmbeddings: [Float16] = []
+        var audioEmbeddings: [OSFloat16] = []
         var audioTokenCount = 0
         for start in stride(
             from: 0,
@@ -696,14 +697,14 @@ public final class MossTranscribeModel: SpeechRecognitionModel, @unchecked Senda
         }
 
         let prefillStarted = CFAbsoluteTimeGetCurrent()
-        var mixedEmbeddings = [Float16](
+        var mixedEmbeddings = [OSFloat16](
             repeating: 0,
             count: prompt.inputIDs.count
                 * decoderConfiguration.hiddenSize
         )
         var audioIndex = 0
         for (position, token) in prompt.inputIDs.enumerated() {
-            let source: ArraySlice<Float16>
+            let source: ArraySlice<OSFloat16>
             if token == promptProcessor.audioTokenID {
                 let start = audioIndex * decoderConfiguration.hiddenSize
                 source = audioEmbeddings[
@@ -809,7 +810,7 @@ public final class MossTranscribeModel: SpeechRecognitionModel, @unchecked Senda
     private func encodeAudio(
         _ features: MossLogMelFeatures,
         realTokenCount: Int
-    ) throws -> [Float16] {
+    ) throws -> [OSFloat16] {
         let input = try Self.makeMultiArray(
             shape: [1, features.melBins, features.timeFrames],
             dataType: .float32
@@ -852,7 +853,7 @@ public final class MossTranscribeModel: SpeechRecognitionModel, @unchecked Senda
         )
     }
 
-    private func embedding(for token: Int) throws -> [Float16] {
+    private func embedding(for token: Int) throws -> [OSFloat16] {
         if let cached = embeddingCache[token] {
             return cached
         }
@@ -886,7 +887,7 @@ public final class MossTranscribeModel: SpeechRecognitionModel, @unchecked Senda
     }
 
     private func runDecoder(
-        embeddings: [Float16],
+        embeddings: [OSFloat16],
         positions: [Int],
         state: MLState
     ) throws -> Int {
@@ -906,7 +907,7 @@ public final class MossTranscribeModel: SpeechRecognitionModel, @unchecked Senda
             dataType: .float16
         )
         let embeddingPointer = embeddingArray.dataPointer.bindMemory(
-            to: Float16.self,
+            to: OSFloat16.self,
             capacity: embeddings.count
         )
         embeddings.withUnsafeBufferPointer { source in
@@ -940,10 +941,10 @@ public final class MossTranscribeModel: SpeechRecognitionModel, @unchecked Senda
             dataType: .float16
         )
         let maskPointer = attentionMask.dataPointer.bindMemory(
-            to: Float16.self,
+            to: OSFloat16.self,
             capacity: maskCount
         )
-        let blocked = Float16(-10_000)
+        let blocked = OSFloat16(-10_000)
         for row in 0..<tokenCount {
             let visibleThrough = positions[row]
             let base = row * decoderConfiguration.maxSequenceLength
@@ -985,7 +986,7 @@ public final class MossTranscribeModel: SpeechRecognitionModel, @unchecked Senda
         from array: MLMultiArray,
         rowCount: Int,
         width: Int
-    ) throws -> [Float16] {
+    ) throws -> [OSFloat16] {
         let shape = array.shape.map(\.intValue)
         let strides = array.strides.map(\.intValue)
         guard
@@ -998,14 +999,14 @@ public final class MossTranscribeModel: SpeechRecognitionModel, @unchecked Senda
             )
         }
 
-        var result = [Float16](
+        var result = [OSFloat16](
             repeating: 0,
             count: rowCount * width
         )
         switch array.dataType {
         case .float16:
             let source = array.dataPointer.assumingMemoryBound(
-                to: Float16.self
+                to: OSFloat16.self
             )
             for row in 0..<rowCount {
                 for column in 0..<width {
@@ -1019,7 +1020,7 @@ public final class MossTranscribeModel: SpeechRecognitionModel, @unchecked Senda
             )
             for row in 0..<rowCount {
                 for column in 0..<width {
-                    result[row * width + column] = Float16(
+                    result[row * width + column] = OSFloat16(
                         source[row * strides[1] + column * strides[2]]
                     )
                 }
@@ -1047,7 +1048,7 @@ public final class MossTranscribeModel: SpeechRecognitionModel, @unchecked Senda
         switch array.dataType {
         case .float16:
             let pointer = array.dataPointer.assumingMemoryBound(
-                to: Float16.self
+                to: OSFloat16.self
             )
             var best = pointer[0]
             for index in 1..<vocabularySize {

@@ -1,6 +1,7 @@
 #if canImport(CoreML)
 import CoreML
 import Foundation
+import Float16Compat
 
 /// CoreML CodeDecoder with scatter-write KV cache.
 ///
@@ -53,19 +54,19 @@ final class TalkerGenerator {
         currentPos = 0
     }
 
-    func forward(embedArray: MLMultiArray) throws -> (logits: [Float], hidden: [Float16]) {
+    func forward(embedArray: MLMultiArray) throws -> (logits: [Float], hidden: [OSFloat16]) {
         return try forwardInternal(inputEmbeds: ensureNCHW(embedArray, channels: hiddenSize))
     }
 
-    func forward(embed: [Float16]) throws -> (logits: [Float], hidden: [Float16]) {
+    func forward(embed: [OSFloat16]) throws -> (logits: [Float], hidden: [OSFloat16]) {
         let inputEmbeds = try MLMultiArray(
             shape: [1, NSNumber(value: hiddenSize), 1, 1], dataType: .float16)
-        let embPtr = inputEmbeds.dataPointer.assumingMemoryBound(to: Float16.self)
+        let embPtr = inputEmbeds.dataPointer.assumingMemoryBound(to: OSFloat16.self)
         for i in 0..<hiddenSize { embPtr[i] = embed[i] }
         return try forwardInternal(inputEmbeds: inputEmbeds)
     }
 
-    private func forwardInternal(inputEmbeds: MLMultiArray) throws -> (logits: [Float], hidden: [Float16]) {
+    private func forwardInternal(inputEmbeds: MLMultiArray) throws -> (logits: [Float], hidden: [OSFloat16]) {
         guard currentPos < maxSeqLen else { throw TalkerError.cacheFull }
 
         let cacheLength = try MLMultiArray(shape: [1], dataType: .int32)
@@ -73,13 +74,13 @@ final class TalkerGenerator {
 
         let keyPaddingMask = try MLMultiArray(
             shape: [1, NSNumber(value: maxSeqLen)], dataType: .float16)
-        let maskPtr = keyPaddingMask.dataPointer.assumingMemoryBound(to: Float16.self)
-        for i in 0..<maxSeqLen { maskPtr[i] = i <= currentPos ? Float16(0) : Float16(-1e4) }
+        let maskPtr = keyPaddingMask.dataPointer.assumingMemoryBound(to: OSFloat16.self)
+        for i in 0..<maxSeqLen { maskPtr[i] = i <= currentPos ? OSFloat16(0) : OSFloat16(-1e4) }
 
         let updateMask = try MLMultiArray(
             shape: [1, NSNumber(value: maxSeqLen)], dataType: .float16)
         memset(updateMask.dataPointer, 0, maxSeqLen * 2)
-        updateMask.dataPointer.assumingMemoryBound(to: Float16.self)[currentPos] = Float16(1.0)
+        updateMask.dataPointer.assumingMemoryBound(to: OSFloat16.self)[currentPos] = OSFloat16(1.0)
 
         var inputs: [String: MLFeatureValue] = [
             "input_embeds": MLFeatureValue(multiArray: inputEmbeds),
@@ -128,20 +129,20 @@ final class TalkerGenerator {
             logits[i] = logitsArray[idx].floatValue
         }
 
-        var hidden = [Float16](repeating: 0, count: hiddenSize)
+        var hidden = [OSFloat16](repeating: 0, count: hiddenSize)
         let hndim = hiddenArray.shape.count
         for i in 0..<hiddenSize {
             var idx = [NSNumber](repeating: 0, count: hndim)
             if hndim >= 4 { idx[1] = i as NSNumber } else { idx[0] = i as NSNumber }
-            hidden[i] = Float16(hiddenArray[idx].floatValue)
+            hidden[i] = OSFloat16(hiddenArray[idx].floatValue)
         }
 
         return (logits, hidden)
     }
 
-    func prefill(embeds: [[Float16]]) throws -> (logits: [Float], hidden: [Float16]) {
+    func prefill(embeds: [[OSFloat16]]) throws -> (logits: [Float], hidden: [OSFloat16]) {
         var lastLogits = [Float]()
-        var lastHidden = [Float16]()
+        var lastHidden = [OSFloat16]()
         for embed in embeds {
             (lastLogits, lastHidden) = try forward(embed: embed)
         }

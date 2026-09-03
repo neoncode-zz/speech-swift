@@ -1,6 +1,7 @@
 import AudioCommon
 import CoreML
 import Foundation
+import Float16Compat
 import Hub
 import Tokenizers
 
@@ -33,7 +34,7 @@ public final class FunctionGemma: @unchecked Sendable {
     public let numLayers: Int = 18
     public static let fullRopeTheta: Double = 1_000_000
     public static let slidingRopeTheta: Double = 10_000
-    public static let maskValue: Float16 = -1.0e4
+    public static let maskValue: OSFloat16 = -1.0e4
 
     // MARK: - Loaded state
 
@@ -205,9 +206,9 @@ public final class FunctionGemma: @unchecked Sendable {
 
         let attentionMask = try MLMultiArray(shape: [1, 1, NSNumber(value: T), NSNumber(value: T)],
                                               dataType: .float16)
-        let attnPtr = attentionMask.dataPointer.bindMemory(to: Float16.self, capacity: T * T)
+        let attnPtr = attentionMask.dataPointer.bindMemory(to: OSFloat16.self, capacity: T * T)
         let N = promptIds.count
-        let unmasked: Float16 = 0
+        let unmasked: OSFloat16 = 0
         for r in 0..<T {
             for c in 0..<T {
                 if r < N {
@@ -219,11 +220,11 @@ public final class FunctionGemma: @unchecked Sendable {
         }
 
         let writeMask = try MLMultiArray(shape: [1, 1, 1, NSNumber(value: T)], dataType: .float16)
-        let wmPtr = writeMask.dataPointer.bindMemory(to: Float16.self, capacity: T)
+        let wmPtr = writeMask.dataPointer.bindMemory(to: OSFloat16.self, capacity: T)
         for i in 0..<T { wmPtr[i] = 1.0 }
 
         let logitsMask = try MLMultiArray(shape: [1, 1, 1, NSNumber(value: T)], dataType: .float16)
-        let lmPtr = logitsMask.dataPointer.bindMemory(to: Float16.self, capacity: T)
+        let lmPtr = logitsMask.dataPointer.bindMemory(to: OSFloat16.self, capacity: T)
         for i in 0..<T { lmPtr[i] = (i == N - 1) ? 1.0 : 0.0 }
 
         let inputs: [String: MLFeatureValue] = [
@@ -257,15 +258,15 @@ public final class FunctionGemma: @unchecked Sendable {
         let sinSliding = try sliceRope(sinSlidingAll, at: position)
 
         let writeMask = try MLMultiArray(shape: [1, 1, 1, NSNumber(value: T)], dataType: .float16)
-        let wmPtr = writeMask.dataPointer.bindMemory(to: Float16.self, capacity: T)
+        let wmPtr = writeMask.dataPointer.bindMemory(to: OSFloat16.self, capacity: T)
         for i in 0..<T { wmPtr[i] = i == position ? 1.0 : 0.0 }
 
         let attnMask = try MLMultiArray(shape: [1, 1, 1, NSNumber(value: T)], dataType: .float16)
-        let amPtr = attnMask.dataPointer.bindMemory(to: Float16.self, capacity: T)
+        let amPtr = attnMask.dataPointer.bindMemory(to: OSFloat16.self, capacity: T)
         for i in 0..<T { amPtr[i] = i <= position ? 0.0 : Self.maskValue }
 
         let logitsMask = try MLMultiArray(shape: [1, 1, 1, 1], dataType: .float16)
-        logitsMask.dataPointer.bindMemory(to: Float16.self, capacity: 1)[0] = 1.0
+        logitsMask.dataPointer.bindMemory(to: OSFloat16.self, capacity: 1)[0] = 1.0
 
         let inputs: [String: MLFeatureValue] = [
             "input_ids":      .init(multiArray: inputId),
@@ -289,9 +290,9 @@ public final class FunctionGemma: @unchecked Sendable {
 
     private func sliceRope(_ table: MLMultiArray, at position: Int) throws -> MLMultiArray {
         let result = try MLMultiArray(shape: [1, 1, NSNumber(value: headDim)], dataType: .float16)
-        let src = table.dataPointer.bindMemory(to: Float16.self,
+        let src = table.dataPointer.bindMemory(to: OSFloat16.self,
                                                 capacity: Int(table.count))
-        let dst = result.dataPointer.bindMemory(to: Float16.self, capacity: headDim)
+        let dst = result.dataPointer.bindMemory(to: OSFloat16.self, capacity: headDim)
         let srcOffset = position * headDim
         for i in 0..<headDim { dst[i] = src[srcOffset + i] }
         return result
@@ -309,7 +310,7 @@ public final class FunctionGemma: @unchecked Sendable {
 
     private static func fp16ToFloats(_ array: MLMultiArray) -> [Float] {
         let count = Int(array.count)
-        let src = array.dataPointer.bindMemory(to: Float16.self, capacity: count)
+        let src = array.dataPointer.bindMemory(to: OSFloat16.self, capacity: count)
         var out = [Float](repeating: 0, count: count)
         for i in 0..<count { out[i] = Float(src[i]) }
         return out
@@ -321,7 +322,7 @@ public final class FunctionGemma: @unchecked Sendable {
                                             NSNumber(value: seqLen),
                                             NSNumber(value: headDim)],
                                     dataType: .float16)
-        let dst = arr.dataPointer.bindMemory(to: Float16.self,
+        let dst = arr.dataPointer.bindMemory(to: OSFloat16.self,
                                              capacity: seqLen * headDim)
         let halfHeadDim = headDim / 2
         var invFreq = [Double](repeating: 0, count: halfHeadDim)
@@ -332,7 +333,7 @@ public final class FunctionGemma: @unchecked Sendable {
             for i in 0..<halfHeadDim {
                 let angle = Double(pos) * invFreq[i]
                 let value = useCos ? cos(angle) : sin(angle)
-                let f16 = Float16(value)
+                let f16 = OSFloat16(value)
                 dst[pos * headDim + i] = f16
                 dst[pos * headDim + halfHeadDim + i] = f16  // mirrored RoPE convention
             }

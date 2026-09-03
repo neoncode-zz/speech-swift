@@ -1,6 +1,7 @@
 import AudioCommon
 import CoreML
 import Foundation
+import Float16Compat
 
 struct WhisperTranscription: Sendable {
     let text: String
@@ -234,10 +235,10 @@ final class WhisperCoreMLRuntime: @unchecked Sendable {
 
     private func makeAudioArray(_ audio: [Float]) throws -> MLMultiArray {
         let array = try MLMultiArray(shape: [maxAudioSamples as NSNumber], dataType: .float16)
-        let ptr = array.dataPointer.assumingMemoryBound(to: Float16.self)
-        ptr.update(repeating: Float16(0), count: array.count)
+        let ptr = array.dataPointer.assumingMemoryBound(to: OSFloat16.self)
+        ptr.update(repeating: OSFloat16(0), count: array.count)
         for i in 0..<min(audio.count, maxAudioSamples) {
-            ptr[i] = Float16(max(-1, min(1, audio[i])))
+            ptr[i] = OSFloat16(max(-1, min(1, audio[i])))
         }
         return array
     }
@@ -316,7 +317,7 @@ final class WhisperCoreMLRuntime: @unchecked Sendable {
 
         switch logits.dataType {
         case .float16:
-            let ptr = logits.dataPointer.assumingMemoryBound(to: Float16.self)
+            let ptr = logits.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             for token in 0..<count where !shouldSkip(token) {
                 let value = Float(ptr[token * stride])
                 if value.isNaN { continue }
@@ -350,8 +351,8 @@ final class WhisperCoreMLRuntime: @unchecked Sendable {
     }
 
     private func copyCacheSlice(_ source: MLMultiArray, into destination: MLMultiArray, tokenCount: Int) {
-        let src = source.dataPointer.assumingMemoryBound(to: Float16.self)
-        let dst = destination.dataPointer.assumingMemoryBound(to: Float16.self)
+        let src = source.dataPointer.assumingMemoryBound(to: OSFloat16.self)
+        let dst = destination.dataPointer.assumingMemoryBound(to: OSFloat16.self)
         let srcStrides = source.strides.map(\.intValue)
         let dstStrides = destination.strides.map(\.intValue)
         let dim = min(source.shape[safe: 1]?.intValue ?? cacheDim, cacheDim)
@@ -367,8 +368,8 @@ final class WhisperCoreMLRuntime: @unchecked Sendable {
     }
 
     private func copyCacheUpdate(_ source: MLMultiArray, into destination: MLMultiArray, at position: Int) {
-        let src = source.dataPointer.assumingMemoryBound(to: Float16.self)
-        let dst = destination.dataPointer.assumingMemoryBound(to: Float16.self)
+        let src = source.dataPointer.assumingMemoryBound(to: OSFloat16.self)
+        let dst = destination.dataPointer.assumingMemoryBound(to: OSFloat16.self)
         let srcStrides = source.strides.map(\.intValue)
         let dstStrides = destination.strides.map(\.intValue)
         let dim = min(source.shape[safe: 1]?.intValue ?? cacheDim, cacheDim)
@@ -380,14 +381,14 @@ final class WhisperCoreMLRuntime: @unchecked Sendable {
         }
     }
 
-    private func fillFloat16(_ array: MLMultiArray, with value: Float16) {
-        let ptr = array.dataPointer.assumingMemoryBound(to: Float16.self)
+    private func fillFloat16(_ array: MLMultiArray, with value: OSFloat16) {
+        let ptr = array.dataPointer.assumingMemoryBound(to: OSFloat16.self)
         ptr.update(repeating: value, count: array.count)
     }
 
-    private func setFloat16(_ array: MLMultiArray, at index: Int, to value: Float16) {
+    private func setFloat16(_ array: MLMultiArray, at index: Int, to value: OSFloat16) {
         guard index >= 0, index < array.count else { return }
-        let ptr = array.dataPointer.assumingMemoryBound(to: Float16.self)
+        let ptr = array.dataPointer.assumingMemoryBound(to: OSFloat16.self)
         ptr[index] = value
     }
 

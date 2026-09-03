@@ -1,4 +1,5 @@
 import Foundation
+import Float16Compat
 import CoreML
 import AudioCommon
 
@@ -275,7 +276,7 @@ public final class SpeechRestorer {
     /// Extract float32 data from an MLMultiArray, handling FP16 output.
     private func extractFlat(_ array: MLMultiArray, into output: inout [Float], count: Int) {
         if array.dataType == .float16 {
-            let ptr = array.dataPointer.assumingMemoryBound(to: Float16.self)
+            let ptr = array.dataPointer.assumingMemoryBound(to: OSFloat16.self)
             for i in 0..<count { output[i] = Float(ptr[i]) }
         } else {
             let ptr = array.dataPointer.assumingMemoryBound(to: Float.self)
