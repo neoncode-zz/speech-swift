@@ -484,6 +484,7 @@ let package = Package(
             name: "SpeechVAD",
             dependencies: [
                 "AudioCommon",
+                "Float16Compat",
                 "MLXCommon",
                 .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "MLXNN", package: "mlx-swift"),
@@ -510,6 +511,7 @@ let package = Package(
             name: "SpeechEnhancement",
             dependencies: [
                 "AudioCommon",
+                "Float16Compat",
                 "MLXCommon",
                 "LocalVQEAECFrontend",
                 .product(name: "MLX", package: "mlx-swift"),
@@ -542,6 +544,7 @@ let package = Package(
             name: "ParakeetASR",
             dependencies: [
                 "AudioCommon",
+                "Float16Compat",
             ]
         ),
         .target(
@@ -667,6 +670,7 @@ let package = Package(
             name: "KokoroTTS",
             dependencies: [
                 "AudioCommon",
+                "Float16Compat",
             ],
             resources: [
                 .process("Resources"),
