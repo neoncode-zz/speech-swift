@@ -410,8 +410,20 @@ public class ParakeetASRModel {
         //     `Parakeet-TDT-v3-CoreML-INT8-30s`, `-iOS-5s`, and the
         //     multi-encoder `Parakeet-TDT-v3-CoreML-INT8` repos fix
         //     that, so macOS now also tries ANE first.
+        //   Intel Macs (x86_64): prefer `.cpuAndGPU`. There is no Neural
+        //     Engine, but requesting `.cpuAndNeuralEngine` does NOT throw —
+        //     CoreML silently degrades to pure CPU, so the `.cpuAndGPU`
+        //     fallback below never fires. On CPU the INT8 encoder costs a
+        //     constant ~4.4 s per call regardless of input length (measured:
+        //     206 and 3000 mel frames both 4.4 s — it is weight-bound
+        //     dequantization, not compute), while the same call on the AMD
+        //     GPU takes ~0.5 s for byte-identical text. Radeon Pro 5700,
+        //     2.06 s clip: 4.41 s → 0.51 s; 7.97 s clip: 4.91 s → 0.54 s.
+        //     `.cpuOnly` stays as the last resort if GPU loading throws.
         #if targetEnvironment(simulator)
         let computeUnitsToTry: [MLComputeUnits] = [.cpuOnly]
+        #elseif arch(x86_64)
+        let computeUnitsToTry: [MLComputeUnits] = [.cpuAndGPU, .cpuOnly]
         #else
         let computeUnitsToTry: [MLComputeUnits] = [.cpuAndNeuralEngine, .cpuAndGPU]
         #endif
