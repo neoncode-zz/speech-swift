@@ -227,13 +227,13 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.30.0"),
+        .package(url: "https://github.com/neoncode-zz/mlx-swift", branch: "macwispr"),
         // Generic LLM runtime (loads standard HF MLX models: Qwen3, Gemma, Llama, …) — backs the
         // larger on-device chat model. The MLXLLM/MLXLMCommon libraries moved here from
-        // mlx-swift-examples. Pins mlx-swift .upToNextMinor(0.31.4), compatible with ours.
-        // Pin the stable release matched to MLX Swift 0.31.4. Tracking the upstream
-        // main branch made clean release and Homebrew builds non-reproducible.
-        .package(url: "https://github.com/ml-explore/mlx-swift-lm", exact: "3.31.4"),
+        // mlx-swift-examples. MacWispr's forks of mlx-swift and mlx-swift-lm are used here too:
+        // mixing them with the ml-explore originals is a SwiftPM identity conflict. The
+        // consuming app's Package.resolved pins exact revisions, so builds stay reproducible.
+        .package(url: "https://github.com/neoncode-zz/mlx-swift-lm", branch: "macwispr"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0"),
         .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", exact: "0.12.1"),
         .package(url: "https://github.com/apple/swift-system.git", from: "1.8.0"),
